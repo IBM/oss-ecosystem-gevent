@@ -1,0 +1,176 @@
+#!/bin/bash
+# Initially based on a snippet from the greenlet project.
+# This needs to be run from the root of the project.
+# To update: docker pull quay.io/pypa/manylinux2010_x86_64
+set -e
+export PYTHONUNBUFFERED=1
+export PYTHONDONTWRITEBYTECODE=1
+# Use a fixed hash seed for reproducability
+export PYTHONHASHSEED=8675309
+# Disable tests that use external network resources;
+# too often we get failures to resolve DNS names or failures
+# to connect on AppVeyor.
+export GEVENTTEST_USE_RESOURCES="-network"
+export CI=1
+export TRAVIS=true
+export GEVENT_MANYLINUX=1
+# Don't get warnings about Python 2 support being deprecated. We
+# know. The env var works for pip 20.
+export PIP_NO_PYTHON_VERSION_WARNING=1
+export PIP_NO_WARN_SCRIPT_LOCATION=1
+
+# Build configuration.
+export CC="ccache `which gcc`"
+export LDSHARED="$CC -shared"
+export LDCCSHARED="$LDSHARED"
+export LDCXXSHARED="$LDSHARED"
+export CCACHE_NOCPP2=true
+export CCACHE_SLOPPINESS=file_macro,time_macros,include_file_ctime,include_file_mtime
+export CCACHE_NOHASHDIR=true
+export CCACHE_BASEDIR="/gevent"
+export BUILD_LIBS=$HOME/.libs
+# Share the ccache directory
+export CCACHE_DIR="/ccache"
+# Disable some warnings produced by libev especially and also some Cython generated code.
+# Note that changing the value of these variables invalidates configure caches
+GEVENT_WARNFLAGS="-pipe -Wno-strict-aliasing -Wno-comment -Wno-unused-value -Wno-unused-but-set-variable -Wno-sign-compare -Wno-parentheses -Wno-unused-function -Wno-tautological-compare -Wno-strict-prototypes -Wno-return-type -Wno-misleading-indentation"
+export CFLAGS="$GEVENT_WARNFLAGS"
+if [ "$DOCKER_IMAGE" == "quay.io/pypa/manylinux2014_ppc64le" -a -n "$GITHUB_ACTIONS" ] ; then
+    # Compiling with -Ofast on the arm emulator takes hours. The default settings have -O3,
+    # and adding -Os doesn't help much. So maybe -O1 will.
+    echo "Compiling with -O1"
+    export CFLAGS="-O1 $GEVENT_WARNFLAGS"
+    SLOW_BUILD=1
+else
+    echo "Compiling with -Ofast"
+    # Note: -Ofast includes -ffast-math which affects process-wide floating-point flags (e.g. can affect numpy).
+    #       We opt out of -ffast-math explicitly. Other libraries can still trigger it.
+    export CFLAGS="-Ofast -fno-fast-math $GEVENT_WARNFLAGS"
+fi
+# -lrt: Needed for clock_gettime libc support on this version.
+# -pthread: Needed for pthread_atfork (cffi).
+
+# This used to be spelled with LDFLAGS, but that is deprecated and
+# produces a warning on the 2014 image (?). Still needed on the
+# 2010 image.
+export LIBS="-lrt -pthread"
+export LDFLAGS="$LIBS"
+# Be sure that we get the loop we expect by default, and not
+# a fallback loop.
+export GEVENT_LOOP="libev-cext"
+
+if [ -d /gevent -a -d /opt/python ]; then
+    # Running inside docker
+    # Set a cache directory for pip. This was
+    # mounted to be the same as it is outside docker so it
+    # can be persisted.
+    export XDG_CACHE_HOME="/cache"
+    # XXX: This works for macOS, where everything bind-mounted
+    # is seen as owned by root in the container. But when the host is Linux
+    # the actual UIDs come through to the container, triggering
+    # pip to disable the cache when it detects that the owner doesn't match.
+    # The below is an attempt to fix that, taken frob bcrypt. It seems to work on
+    # Github Actions.
+    if [ -n "$GITHUB_ACTIONS" ]; then
+        echo Adjusting pip cache permissions
+        mkdir -p $XDG_CACHE_HOME/pip
+        chown -R $(whoami) $XDG_CACHE_HOME
+    fi
+    ls -ld /cache
+    ls -ld /cache/pip
+    if [ -e /usr/bin/yum ]; then
+        yum -y install libffi-devel
+        # Some images/archs (specificaly 2014_aarch64) don't have ccache;
+        # This also seems to have vanished for manylinux_2010 x64/64 after November 30
+        # 2020 when the OS went EOL and the package repos switched to the "vault"
+        if [ -n "$SLOW_BUILD" ] ; then
+            # This provides access to ccache for the 2014 image
+            echo Installing epel
+            rpm -Uvh https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm
+        fi
+        yum -y install ccache || export CC=gcc LDSHARED="gcc -shared" LDCXXSHARED="gcc -shared"
+        # On Fedora Rawhide (F33)
+        # yum install python39 python3-devel gcc kernel-devel kernel-headers make diffutils file
+    fi
+    if [ -e /sbin/apk ]; then
+        # the muslinux image
+        apk add --no-cache build-base libffi-dev ccache
+    fi
+
+    echo Current environment
+    env | sort
+
+    mkdir /tmp/build
+    cd /tmp/build
+    git clone /gevent gevent
+    cd gevent
+    if [ -z "$GEVENTSETUP_DISABLE_ARES" ]; then
+        echo Configuring cares
+        time (cd deps/c-ares && ./configure --disable-dependency-tracking -C > /dev/null )
+    else
+        echo Not configuring c-ares because it is disabled
+    fi
+    rm -rf /gevent/wheelhouse
+    mkdir /gevent/wheelhouse
+    OPATH="$PATH"
+    which auditwheel
+    for variant in `ls -d /opt/python/cp{310,27,36,37,38,39}*`; do
+        export PATH="$variant/bin:$OPATH"
+        echo "Building $variant $(python --version)"
+
+        python -mpip install -U pip
+        # Build the wheel *in place*. This helps with cahching.
+        # The downside is that we must install dependencies manually.
+        # NOTE: We can't upgrade ``wheel`` because ``auditwheel`` depends on
+        # it, and auditwheel is installed in one of these environments.
+        python -mpip install -U "cython >= 3.0a6" cffi 'greenlet >= 1.0' setuptools
+        time (python setup.py bdist_wheel)
+        PATH="$OPATH" auditwheel repair dist/gevent*.whl
+        cp wheelhouse/gevent*.whl /gevent/wheelhouse
+
+        python -mpip install -U --no-compile `ls dist/gevent*whl`[test]
+        echo 'Installation details'
+        python -c 'from __future__ import print_function; import gevent; print(gevent, gevent.__version__)'
+        python -c 'from __future__ import print_function; from gevent._compat import get_clock_info; print("clock info", get_clock_info("perf_counter"))'
+        python -c 'from __future__ import print_function; import greenlet; print(greenlet, greenlet.__version__)'
+        python -c 'from __future__ import print_function; import gevent.core; print("default loop", gevent.core.loop)'
+        # Other loops we should have
+        GEVENT_LOOP=libuv python -c 'from __future__ import print_function; import gevent.core; print("libuv loop", gevent.core.loop)'
+        GEVENT_LOOP=libev-cffi python -c 'from __future__ import print_function; import gevent.core; print("libev-cffi loop", gevent.core.loop)'
+        if [ -z "$GEVENTSETUP_DISABLE_ARES" ]; then
+            python -c 'from __future__ import print_function; import gevent.ares; print("ares", gevent.ares)'
+        fi
+
+        if [ -z "$GEVENTTEST_SKIP_ALL" ]; then
+            python -mgevent.tests --second-chance
+        else
+            # Allow skipping the bulk of the tests. If we're emulating Arm,
+            # running the whole thing takes forever.
+            # XXX: It's possible that what takes forever is actually building gevent itself.
+            python -mgevent.tests.test__core
+        fi
+        rm -rf build
+        rm -f dist/gevent*.whl
+        ccache -s || true
+    done
+    ccache -s || true
+    exit 0
+fi
+
+# Mount the current directory as /gevent
+# Mount the pip cache directory as /cache
+# `pip cache` requires pip 20.1
+echo Setting up caching
+python --version
+python -mpip --version
+LCACHE="$(dirname `python -mpip cache dir`)"
+echo Sharing pip cache at $LCACHE $(ls -ld $LCACHE)
+echo Sharing ccache dir at $HOME/.ccache
+if [ ! -d $HOME/.ccache ]; then
+    mkdir $HOME/.ccache
+fi
+# Travis CI and locally we want `-ti`, but github actions doesn't have a TTY, so one
+# or the other of the arguments causes this to fail with 'input device is not a TTY'
+# Pas through whether we're running on github or not to help with caching.
+docker run --rm -e GEVENT_MANYLINUX_NAME -e GEVENTSETUP_DISABLE_ARES -e GITHUB_ACTIONS -e GEVENTTEST_SKIP_ALL -e DOCKER_IMAGE -v "$(pwd):/gevent" -v "$LCACHE:/cache" -v "$HOME/.ccache:/ccache" ${DOCKER_IMAGE:-quay.io/pypa/manylinux2010_x86_64} /gevent/scripts/releases/$(basename $0)
+ls -l wheelhouse
