@@ -35,6 +35,6 @@ jobs:
           
   build-new-release:
     if: ${{ needs.check-release.outputs.latest-release }} != ${{ needs.check-release.outputs.current-release }}
-    uses: ./.github/workflows/build_gevent.yml
+    uses: ./.github/workflows/build_gevent.yaml
     with:
       release: ${{ needs.check-release.outputs.latest-release }}
