@@ -53,6 +53,11 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v2
+      - name: Checkout gevent repo
+        uses: actions/checkout@v3
+        with:
+          repository: https://github.com/gevent/gevent.git
+          path: gevent
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
@@ -93,6 +98,7 @@ jobs:
           GEVENTTEST_SKIP_ALL: 1
           GEVENTSETUP_DISABLE_ARES: 1
         run: |
+          cd gevent
           chmod +x scripts/releases/make-manylinux
           ./scripts/releases/make-manylinux
       - name: Upload gevent wheels
