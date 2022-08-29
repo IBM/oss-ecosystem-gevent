@@ -92,7 +92,9 @@ jobs:
           DOCKER_IMAGE: quay.io/pypa/manylinux2014_ppc64le
           GEVENTTEST_SKIP_ALL: 1
           GEVENTSETUP_DISABLE_ARES: 1
-        run: scripts/releases/make-manylinux
+        run: |
+          chmod +x scripts/releases/make-manylinux
+          ./scripts/releases/make-manylinux
       - name: Upload gevent wheels
         uses: actions/upload-artifact@v2
         with:
