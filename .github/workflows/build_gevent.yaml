@@ -101,11 +101,8 @@ jobs:
           cd gevent
           chmod +x scripts/releases/make-manylinux
           ./scripts/releases/make-manylinux
-      - name: Upload gevent wheels
-        uses: actions/upload-artifact@v2
-        with:
-          path: wheelhouse/*whl
-          name: manylinux_ppc64le_wheels.zip
+          tar -zcvf manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz wheelhouse/
+          ls
       - name: Create Release
         id: create_release
         uses: ncipollo/release-action@v1
@@ -113,8 +110,8 @@ jobs:
           tag: ${{ inputs.release }}
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
-          artifacts: wheelhouse/*whl
-          name: manylinux_ppc64le_wheels_${{ inputs.release }}.zip
+          artifacts: manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz
+          name: ${{ inputs.release }}
           replacesArtifacts: true
           draft: false
           prerelease: false 
