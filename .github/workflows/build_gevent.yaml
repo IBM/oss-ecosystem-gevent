@@ -103,6 +103,7 @@ jobs:
           ./scripts/releases/make-manylinux
           tar -zcvf manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz wheelhouse/
           ls
+          pwd
       - name: Create Release
         id: create_release
         uses: ncipollo/release-action@v1
@@ -110,7 +111,7 @@ jobs:
           tag: ${{ inputs.release }}
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
-          artifacts: manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz
+          artifacts: gevent/manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz
           name: ${{ inputs.release }}
           replacesArtifacts: true
           draft: false
