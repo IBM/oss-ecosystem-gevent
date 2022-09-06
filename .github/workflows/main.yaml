@@ -34,6 +34,7 @@ jobs:
           echo "Current gevent version on Power: "$GE_CURRENT
           
   build-new-release:
+    needs: [check-release]
     if: ${{ needs.check-release.outputs.latest-release }} != ${{ needs.check-release.outputs.current-release }}
     uses: ./.github/workflows/build_gevent.yaml
     with:
