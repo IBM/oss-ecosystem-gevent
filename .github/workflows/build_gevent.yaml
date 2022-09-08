@@ -58,6 +58,7 @@ jobs:
         with:
           repository: gevent/gevent
           path: gevent
+          fetch-depth: 0
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
