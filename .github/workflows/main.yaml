@@ -22,7 +22,7 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y curl jq
           
-          GE_LATEST=$(curl -s https://pypi.org/pypi/gevent/json | jq '.info.version')
+          GE_LATEST=$(curl -s https://pypi.org/pypi/gevent/json | jq -r '.info.version')
           echo '::set-output name=LATEST_RELEASE::'$GE_LATEST
           echo "Latest gevent version: "$GE_LATEST
           
