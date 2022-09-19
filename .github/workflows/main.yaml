@@ -2,7 +2,7 @@ name: Check for new gevent release
 
 on:
   schedule:
-    - cron: '0 0 1 * *'
+    - cron: '0 0 * * MON'
   workflow_dispatch:
 
 jobs:
