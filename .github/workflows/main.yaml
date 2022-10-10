@@ -38,4 +38,4 @@ jobs:
     if: ${{ needs.check-release.outputs.latest-release }} != ${{ needs.check-release.outputs.current-release }}
     uses: ./.github/workflows/build_gevent.yaml
     with:
-      release: 21.8.0
+      release: ${{ needs.check-release.outputs.latest-release }}
