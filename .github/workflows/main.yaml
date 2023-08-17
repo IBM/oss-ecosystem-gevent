@@ -14,7 +14,7 @@ jobs:
       current-release: ${{ steps.current.outputs.CURRENT_RELEASE }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Get latest gevent release
         id: latest
@@ -23,14 +23,14 @@ jobs:
           sudo apt-get install -y curl jq
           
           GE_LATEST=$(curl -s https://pypi.org/pypi/gevent/json | jq -r '.info.version')
-          echo '::set-output name=LATEST_RELEASE::'$GE_LATEST
+          echo "LATEST_RELEASE=$GE_LATEST" >> $GITHUB_OUTPUT
           echo "Latest gevent version: "$GE_LATEST
           
       - name: Get current gevent release for Power
         id: current
         run: |
           GE_CURRENT=$(curl -s https://api.github.com/repos/IBM/oss-ecosystem-gevent/releases/latest | grep tag_name | cut -d '"' -f4)
-          echo '::set-output name=CURRENT_RELEASE::'$GE_CURRENT
+          echo "CURRENT_RELEASE=$GE_CURRENT" >> $GITHUB_OUTPUT
           echo "Current gevent version on Power: "$GE_CURRENT
           
   build-new-release:
