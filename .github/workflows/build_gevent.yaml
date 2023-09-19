@@ -1,8 +1,13 @@
 
 
-name: gevent testing
+name: Build gevent for Power
 
-on: 
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        required: true
+        type: string
   workflow_call:
     inputs:
       release:
@@ -52,22 +57,26 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+
       - name: Checkout gevent repo
         uses: actions/checkout@v3
         with:
           repository: gevent/gevent
           path: gevent
           fetch-depth: 0
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Cache ~/.ccache
         uses: actions/cache@v2
         with:
           path: ~/.ccache/
           key: ${{ runner.os }}-ccache_manylinux-${{ matrix.python-version }}
+
       - name: Get pip cache dir
         id: pip-cache
         run: |
@@ -104,17 +113,13 @@ jobs:
           chmod +x scripts/releases/make-manylinux
           ./scripts/releases/make-manylinux
           tar -zcvf manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz wheelhouse/
+
       - name: Create Release
-        id: create_release
-        uses: ncipollo/release-action@v1
+        uses: softprops/action-gh-release@v1
         with:
-          tag: ${{ inputs.release }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          artifacts: gevent/manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz
           name: ${{ inputs.release }}
-          replacesArtifacts: true
+          tag_name: ${{ inputs.release }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: gevent/manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz
           draft: false
-          prerelease: false 
-
-
+          prerelease: false
