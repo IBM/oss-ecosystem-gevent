@@ -111,6 +111,7 @@ jobs:
           cd gevent
           git checkout tags/${{ inputs.release }}
           chmod +x scripts/releases/make-manylinux
+          sed -i -E 's/is_security_fix_only=.*/is_security_fix_only=False/' scripts/releases/make-manylinux
           ./scripts/releases/make-manylinux
           tar -zcvf manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz wheelhouse/
 
