@@ -67,12 +67,12 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Cache ~/.ccache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ~/.ccache/
           key: ${{ runner.os }}-ccache_manylinux-${{ matrix.python-version }}
@@ -83,7 +83,7 @@ jobs:
           echo "::set-output name=dir::$(pip cache dir)"
 
       - name: pip cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ${{ steps.pip-cache.outputs.dir }}
           key: ${{ runner.os }}-pip_manylinux_ppc64le-${{ matrix.python-version }}
@@ -116,7 +116,7 @@ jobs:
           tar -zcvf manylinux_ppc64le_wheels_${{ inputs.release }}.tar.gz wheelhouse/
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: ${{ inputs.release }}
           tag_name: ${{ inputs.release }}
