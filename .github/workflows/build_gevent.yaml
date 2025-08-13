@@ -57,10 +57,10 @@ jobs:
 
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout gevent repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: gevent/gevent
           path: gevent
